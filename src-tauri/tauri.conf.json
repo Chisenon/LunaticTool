@@ -10,9 +10,9 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "lunatictool",
-        "width": 800,
-        "height": 600
+        "title": "LunaticTool",
+        "width": 420,
+        "height": 240
       }
     ],
     "security": {

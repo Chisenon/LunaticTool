@@ -1,39 +1,37 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <title>LunaticTool</title>
     <link rel="stylesheet" href="styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri App</title>
     <script type="module" src="/main.js" defer></script>
   </head>
 
   <body>
-    <main class="container">
-      <h1>Welcome to Tauri</h1>
-
-      <div class="row">
-        <a href="https://tauri.app" target="_blank">
-          <img src="/assets/tauri.svg" class="logo tauri" alt="Tauri logo" />
-        </a>
-        <a
-          href="https://developer.mozilla.org/en-US/docs/Web/JavaScript"
-          target="_blank"
-        >
-          <img
-            src="/assets/javascript.svg"
-            class="logo vanilla"
-            alt="JavaScript logo"
-          />
-        </a>
+    <div class="container">
+      <div class="top-bar">
+        <input
+          type="text"
+          id="data-input"
+          placeholder=",(カンマ)区切りで連結したVRC表示名を入力"
+        />
+        <button id="send-button">セット</button>
       </div>
-      <p>Click on the Tauri logo to learn more about the framework</p>
 
-      <form class="row" id="greet-form">
-        <input id="greet-input" placeholder="Enter a name..." />
-        <button type="submit">Greet</button>
-      </form>
-      <p id="greet-msg"></p>
-    </main>
+      <!-- データ表示 -->
+      <div id="output-area"></div>
+
+      <div class="bottom-bar">
+        <button id="reset-button">リセット</button>
+      </div>
+
+      <!-- ディレクトリ表示＆エクスプローラー表示ボタン -->
+      <div class="bottom-bar">
+        <div id="log-dir">C:/example/log/</div>
+        <button id="open-explorer">開く</button>
+      </div>
+      
+    </div>
   </body>
 </html>

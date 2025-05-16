@@ -1,12 +1,16 @@
 {
   "name": "lunatictool",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "tauri": "tauri"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"
+  },
+  "dependencies": {
+    "@tauri-apps/plugin-opener": "^2.2.6",
+    "@tauri-apps/tauricon": "^1.0.3"
   }
 }

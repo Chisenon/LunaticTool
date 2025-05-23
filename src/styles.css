@@ -10,6 +10,10 @@
   --color-active: #333;
   --color-white: white;
   --color-black: black;
+  --color-recording-on: #ff4444;
+  --color-recording-off: #4a4a4a;
+  --color-edit-on: #44ff44;
+  --color-edit-off: #4a4a4a;
   --gap-small: 4px;
   --padding-small: 4px;
   --padding-medium: 6px;
@@ -118,6 +122,22 @@ button {
   padding: 2px;
   background-color: var(--color-white);
   min-width: 0;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.data-block:hover {
+  transform: translateY(-1px);
+}
+
+.data-block.dragging {
+  opacity: 0.5;
+  transform: rotate(5deg);
+}
+
+.data-block.drag-over {
+  border-color: #007acc;
+  background-color: #e3f2fd;
 }
 
 .number {
@@ -146,6 +166,21 @@ button {
   text-align: center;
 }
 
+.value.editable {
+  background-color: #f0f0f0;
+  border: 1px dashed #ccc;
+  cursor: text;
+}
+
+.value input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  text-align: center;
+  font-size: inherit;
+  color: inherit;
+}
+
 #log-dir {
   flex: 3;
   padding: var(--padding-small) var(--padding-medium);
@@ -157,8 +192,38 @@ button {
   text-overflow: clip;
 }
 
-#start-button,
-#reset-button {
+#reset-button,
+#recording-button,
+#edit-button {
+  flex: 1;
+  height: var(--button-height);
+  background-color: var(--color-darker);
+  color: var(--color-white);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+#reset-button:hover,
+#recording-button:hover,
+#edit-button:hover {
+  background-color: var(--color-hover);
+}
+
+#reset-button:active,
+#recording-button:active,
+#edit-button:active {
+  background-color: var(--color-active);
+}
+
+#recording-button.recording-active {
+  background-color: var(--color-recording-on);
+}
+
+#edit-button.edit-active {
+  background-color: var(--color-edit-on);
+}
+
+#start-button {
   flex: 1;
   height: var(--button-height);
   background-color: var(--color-darker);
@@ -166,12 +231,10 @@ button {
   cursor: pointer;
 }
 
-#start-button:hover,
-#reset-button:hover {
+#start-button:hover {
   background-color: var(--color-hover);
 }
 
-#start-button:active,
-#reset-button:active {
+#start-button:active {
   background-color: var(--color-active);
 }

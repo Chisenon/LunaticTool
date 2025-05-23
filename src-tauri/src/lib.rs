@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, Mutex},
     thread,
     time::{Duration, Instant},
-    collections::VecDeque,
+    collections::{VecDeque, HashSet},
 };
 
 use once_cell::sync::Lazy;
@@ -32,6 +32,9 @@ static OSC_QUEUE: Lazy<Mutex<VecDeque<OscQueueItem>>> = Lazy::new(|| Mutex::new(
 static LAST_SEND_TIME: Lazy<Mutex<Option<Instant>>> = Lazy::new(|| Mutex::new(None));
 static WATCH_THREAD: Lazy<Mutex<Option<std::thread::JoinHandle<()>>>> = Lazy::new(|| Mutex::new(None));
 static SHOULD_RUN: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(true));
+static IS_RECORDING: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
+static IN_ROUND: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
+static RECORDED_PLAYERS: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
 
 // OSCメッセージ送信の最小間隔（ミリ秒）
 const MIN_SEND_INTERVAL_MS: u64 = 500; // 0.5秒間隔
@@ -113,6 +116,20 @@ fn open_explorer(path: String) {
         }
     } else {
         eprintln!("指定されたパスから親ディレクトリを取得できませんでした");
+    }
+}
+
+#[tauri::command]
+fn toggle_recording(enabled: bool) {
+    IS_RECORDING.store(enabled, Ordering::SeqCst);
+    if enabled {
+        // レコーディング開始時に記録済みプレイヤーリストをクリア
+        RECORDED_PLAYERS.lock().unwrap().clear();
+        IN_ROUND.store(false, Ordering::SeqCst);
+        println!("レコーディング開始 - 記録済みプレイヤーリストをクリア");
+    } else {
+        IN_ROUND.store(false, Ordering::SeqCst);
+        println!("レコーディング終了");
     }
 }
 
@@ -212,6 +229,30 @@ fn send_reset(window: tauri::Window) {
     }
 }
 
+// 新しいプレイヤーを記録済みリストに追加し、フロントエンドに通知する関数
+fn record_new_player(player_name: &str, targets: &Arc<Vec<Target>>, window: &tauri::Window) {
+    let mut recorded = RECORDED_PLAYERS.lock().unwrap();
+    
+    // 既に記録済みかチェック
+    if recorded.contains(player_name) {
+        return;
+    }
+    
+    // 既存のターゲットに含まれているかチェック
+    if targets.iter().any(|t| t.value == player_name) {
+        return;
+    }
+    
+    // 新しいプレイヤーとして記録
+    recorded.insert(player_name.to_string());
+    println!("新しいプレイヤーを記録: {}", player_name);
+    
+    // フロントエンドに通知
+    if let Err(e) = window.emit("recording-new-player", player_name) {
+        eprintln!("新プレイヤー通知エラー: {}", e);
+    }
+}
+
 #[tauri::command]
 fn start_log_watch(targets: Vec<Target>, window: tauri::Window) {
     SHOULD_RUN.store(false, Ordering::SeqCst);
@@ -239,7 +280,7 @@ fn start_log_watch(targets: Vec<Target>, window: tauri::Window) {
             let targets = Arc::new(targets);
             let handle = thread::spawn({
                 let targets = Arc::clone(&targets);
-                let window = window.clone(); // 窓をクローンしてスレッド内で使う
+                let window = window.clone();
                 move || {
                     let file = match File::open(&path) {
                         Ok(f) => f,
@@ -254,9 +295,36 @@ fn start_log_watch(targets: Vec<Target>, window: tauri::Window) {
                         let mut buffer = String::new();
 
                         while reader.read_line(&mut buffer).unwrap_or(0) > 0 {
+                            // レコーディング機能: "and the round type is" を検出してラウンド開始フラグを立てる
+                            if IS_RECORDING.load(Ordering::SeqCst) && buffer.contains("and the round type is") {
+                                if !IN_ROUND.load(Ordering::SeqCst) {
+                                    IN_ROUND.store(true, Ordering::SeqCst);
+                                    println!("ラウンド開始を検出しました");
+                                    // ラウンド開始時に記録済みプレイヤーリストをクリア
+                                    RECORDED_PLAYERS.lock().unwrap().clear();
+                                    println!("ラウンド開始 - 記録済みプレイヤーリストをクリア");
+                                }
+                            }
+
+                            // "RoundOver" 検出
                             if buffer.contains("RoundOver") {
                                 // "RoundOver" が見つかった場合、キューをクリア
                                 clear_osc_queue();
+                                
+                                // レコーディング中かつラウンド中の場合
+                                if IS_RECORDING.load(Ordering::SeqCst) && IN_ROUND.load(Ordering::SeqCst) {
+                                    IN_ROUND.store(false, Ordering::SeqCst);
+                                    println!("ラウンド終了を検出しました");
+                                    
+                                    // レコーディング終了処理
+                                    IS_RECORDING.store(false, Ordering::SeqCst);
+                                    println!("RoundOver検出 - レコーディングを自動終了");
+                                    
+                                    // フロントエンドにround-overイベントを送信
+                                    if let Err(e) = window.emit("round-over", ()) {
+                                        eprintln!("round-over emit error: {}", e);
+                                    }
+                                }
                                 
                                 // OSCリセット信号を送信
                                 send_osc_message(
@@ -265,15 +333,22 @@ fn start_log_watch(targets: Vec<Target>, window: tauri::Window) {
                                 );
                                 
                                 // フロントエンドにリセットイベントを送信
-                                // これは手動で赤くされたものを保持するように、フロントエンド側で処理
                                 if let Err(e) = window.emit("reset-hit", ()) {
                                     eprintln!("emit error: {}", e);
                                 }
                             }
 
+                            // "[DEATH][" パターンを検出
                             if let Some(start) = buffer.find("[DEATH][") {
                                 if let Some(end) = buffer[start + 8..].find(']') {
                                     let name = &buffer[start + 8..start + 8 + end];
+                                    
+                                    // レコーディング機能: ラウンド中に新しい名前を発見した場合
+                                    if IS_RECORDING.load(Ordering::SeqCst) && IN_ROUND.load(Ordering::SeqCst) {
+                                        record_new_player(name, &targets, &window);
+                                    }
+                                    
+                                    // 通常の処理: 既存のターゲットとマッチした場合
                                     if let Some(target) = targets.iter().find(|t| t.value == name) {
                                         // キューに追加（即時送信ではなく）
                                         queue_osc_message(target.number, &window);
@@ -303,6 +378,7 @@ pub fn run() {
             open_explorer,
             start_log_watch,
             send_reset,
+            toggle_recording,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

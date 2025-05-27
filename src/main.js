@@ -15,11 +15,9 @@ const elements = {
 let isWatching = false;
 let isRecording = false;
 let isEditMode = false;
-// 手動でクリックされたブロックを追跡するためのセット
 const manuallyHighlightedBlocks = new Set();
 let currentData = [];
-// レコーディング用の変数
-let recordedNewPlayers = []; // レコーディング中に追加された新しいプレイヤー
+let recordedNewPlayers = [];
 
 window.addEventListener("DOMContentLoaded", async () => {
   await displayLogDir();
@@ -29,31 +27,31 @@ window.addEventListener("DOMContentLoaded", async () => {
 async function displayLogDir() {
   try {
     const logFilePath = await invoke("get_latest_log_file");
-    elements.logDir.textContent = logFilePath || "ログファイルが見つかりませんでした。";
+    elements.logDir.textContent = logFilePath || "Log file not found.";
   } catch (e) {
-    elements.logDir.textContent = `エラー: ${e}`;
+    elements.logDir.textContent = `Error: ${e}`;
   }
 }
 
 elements.openExplorerButton.addEventListener("click", async () => {
   const filePath = elements.logDir.textContent;
-  if (!filePath || filePath === "ログファイルが見つかりませんでした。") return;
+  if (!filePath || filePath === "Log file not found.") return;
 
   try {
     await invoke("open_explorer", { path: filePath });
   } catch (e) {
-    console.error("エクスプローラーを開く際にエラーが発生しました", e);
+    console.error("Error occurred while opening Explorer", e);
   }
 });
 
-// data-inputにエンターキーイベントを追加
+// Add Enter key event to data-input
 elements.dataInput.addEventListener("keydown", async (e) => {
   if (e.key === "Enter") {
-    e.preventDefault(); // デフォルトの動作を防ぐ
-    
+    e.preventDefault();
+
     const rawInput = elements.dataInput.value.trim();
-    
-    // 入力が空の場合はリストをクリア
+
+    // If input is empty, clear the list
     if (!rawInput) {
       clearDataAndDisplay();
       return;
@@ -62,25 +60,21 @@ elements.dataInput.addEventListener("keydown", async (e) => {
     try {
       const html = await invoke("split_and_format", { text: rawInput });
       updateOutput(html);
-      // 現在のデータを保存
       currentData = rawInput.split(',').map(str => str.trim()).filter(str => str.length > 0);
-      // HTML更新後に、クリックイベントを追加
       addClickHandlersToBlocks();
-      // エディットモードが有効な場合は再有効化
       if (isEditMode) {
         enableEditMode();
       }
       startWatcher();
     } catch (e) {
-      updateOutput(`<p>エラー: ${e}</p>`);
+      updateOutput(`<p>Error: ${e}</p>`);
     }
   }
 });
 
 elements.sendButton.addEventListener("click", async () => {
   const rawInput = elements.dataInput.value.trim();
-  
-  // 入力が空の場合はリストをクリア
+
   if (!rawInput) {
     clearDataAndDisplay();
     return;
@@ -89,40 +83,37 @@ elements.sendButton.addEventListener("click", async () => {
   try {
     const html = await invoke("split_and_format", { text: rawInput });
     updateOutput(html);
-    // 現在のデータを保存
     currentData = rawInput.split(',').map(str => str.trim()).filter(str => str.length > 0);
-    // HTML更新後に、クリックイベントを追加
     addClickHandlersToBlocks();
-    // エディットモードが有効な場合は再有効化
     if (isEditMode) {
       enableEditMode();
     }
     startWatcher();
   } catch (e) {
-    updateOutput(`<p>エラー: ${e}</p>`);
+    updateOutput(`<p>Error: ${e}</p>`);
   }
 });
 
-// データとディスプレイをクリアする関数
+// Function to clear data and display
 function clearDataAndDisplay() {
   currentData = [];
   updateOutput('');
   manuallyHighlightedBlocks.clear();
-  console.log("データとディスプレイをクリアしました");
-  
-  // ウォッチャーを停止
+  console.log("Data and display cleared");
+
+  // Stop watcher
   stopWatcher();
 }
 
-// ウォッチャーを停止する関数
+// Function to stop watcher
 async function stopWatcher() {
   try {
-    // 空の配列でウォッチャーを開始することで実質的に停止
+    // Effectively stop by starting watcher with empty array
     await invoke("start_log_watch", { targets: [] });
     isWatching = false;
-    console.log("ウォッチャーを停止しました");
+    console.log("Watcher stopped");
   } catch (e) {
-    console.error("ウォッチャー停止中にエラーが発生しました", e);
+    console.error("Error occurred while stopping watcher", e);
   }
 }
 
@@ -130,45 +121,44 @@ elements.resetButton.addEventListener("click", async () => {
   try {
     await invoke("send_reset");
   } catch (e) {
-    console.error("リセット信号の送信に失敗しました", e);
+    console.error("Failed to send reset signal", e);
   }
 });
 
 elements.recordingButton.addEventListener("click", async () => {
   isRecording = !isRecording;
   elements.recordingButton.classList.toggle("recording-active", isRecording);
-  elements.recordingButton.textContent = isRecording ? "レコーディング中" : "レコーディング";
-  
-  // レコーディング開始時の処理
+  elements.recordingButton.textContent = isRecording ? "Recording..." : "Record";
+
+  // When recording starts
   if (isRecording) {
-    recordedNewPlayers = []; // 新プレイヤーリストをクリア
-    currentData = []; // 現在のデータをクリア
-    updateInputField(); // 入力欄もクリア
-    updateOutput(''); // 表示もクリア
-    console.log("レコーディング開始 - データをクリア");
-    
-    // 空のデータでもウォッチャーを確実に開始
+    recordedNewPlayers = [];
+    currentData = [];
+    updateInputField();
+    updateOutput('');
+    console.log("Recording started - data cleared");
+
     await startWatcherForRecording();
   } else {
-    // レコーディング終了時に新しいプレイヤーがいれば統合
+    // When recording ends, integrate new players if any
     if (recordedNewPlayers.length > 0) {
       integrateNewPlayersFromEmpty();
     }
   }
-  
+
   try {
     await invoke("toggle_recording", { enabled: isRecording });
-    console.log(`レコーディング状態を変更: ${isRecording}`);
+    console.log(`Changed recording state: ${isRecording}`);
   } catch (e) {
-    console.error("レコーディング状態の切り替えに失敗しました", e);
+    console.error("Failed to toggle recording state", e);
   }
 });
 
 elements.editButton.addEventListener("click", () => {
   isEditMode = !isEditMode;
   elements.editButton.classList.toggle("edit-active", isEditMode);
-  elements.editButton.textContent = isEditMode ? "エディット中" : "エディット";
-  
+  elements.editButton.textContent = isEditMode ? "Editing..." : "Edit";
+
   if (isEditMode) {
     enableEditMode();
   } else {
@@ -180,34 +170,30 @@ function updateOutput(content) {
   elements.outputArea.innerHTML = content;
 }
 
-// 更新後にクリックイベントを追加する関数
+// Add click events after update
 function addClickHandlersToBlocks() {
   const blocks = document.querySelectorAll(".data-block");
   blocks.forEach(block => {
-    // 既存のイベントリスナーを削除（重複防止）
+    // Remove existing event listeners (to prevent duplicates)
     const newBlock = block.cloneNode(true);
     block.parentNode.replaceChild(newBlock, block);
   });
-  
-  // 新しいブロックにイベントを追加
+
+  // Add events to new blocks
   const newBlocks = document.querySelectorAll(".data-block");
   newBlocks.forEach(block => {
-    // 通常のクリックイベント
     block.addEventListener("click", function(e) {
-      if (isEditMode) return; // エディットモードではクリックを無効化
-      
+      if (isEditMode) return;
+
       const numberElement = this.querySelector(".number");
       const number = parseInt(numberElement?.textContent.trim(), 10);
-      
-      // ブロックのID作成
+
       const blockId = `block-${number}`;
-      
+
       if (manuallyHighlightedBlocks.has(blockId)) {
-        // 既に手動で赤くされている場合は元に戻す
         this.style.backgroundColor = '';
         manuallyHighlightedBlocks.delete(blockId);
       } else {
-        // 手動で赤くする
         this.style.backgroundColor = 'red';
         manuallyHighlightedBlocks.add(blockId);
       }
@@ -220,44 +206,38 @@ function enableEditMode() {
 }
 
 function disableEditMode() {
-  // 通常のブロック表示に戻す
   const newInput = currentData.join(', ');
   if (newInput) {
     invoke("split_and_format", { text: newInput })
       .then(html => {
         updateOutput(html);
         addClickHandlersToBlocks();
-        // ウォッチャーを再開して監視データを更新
         startWatcher();
       })
       .catch(e => {
-        console.error("HTML再生成エラー:", e);
+        console.error("Error regenerating HTML:", e);
       });
   } else {
     updateOutput('');
-    // データが空の場合はウォッチャーを停止
     stopWatcher();
   }
 }
 
-// エディット可能なリスト表示（縦二列形式）
+// Editable list display (two vertical columns)
 function renderEditableList() {
   const outputArea = elements.outputArea;
-  
-  // 既存の内容をクリア
+
   while (outputArea.firstChild) {
     outputArea.removeChild(outputArea.firstChild);
   }
-  
-  // コンテナを作成
+
   const container = document.createElement("div");
   container.style.display = "flex";
   container.style.flexWrap = "wrap";
   container.style.gap = "4px";
   container.style.alignContent = "flex-start";
   container.style.width = "100%";
-  
-  // 左右のカラムを作成
+
   const leftColumn = document.createElement("div");
   const rightColumn = document.createElement("div");
   leftColumn.style.flex = "1";
@@ -268,23 +248,20 @@ function renderEditableList() {
   rightColumn.style.display = "flex";
   rightColumn.style.flexDirection = "column";
   rightColumn.style.gap = "4px";
-  
+
   container.appendChild(leftColumn);
   container.appendChild(rightColumn);
   outputArea.appendChild(container);
-  
-  // データを左右のカラムに振り分け（縦二列形式）
+
   const half = Math.ceil(currentData.length / 2);
-  
-  // 左カラム（1番から half番まで）
+
   for (let i = 0; i < half; i++) {
     if (i < currentData.length) {
       const dataBlock = createEditableBlock(currentData[i], i + 1, i);
       leftColumn.appendChild(dataBlock);
     }
   }
-  
-  // 右カラム（half+1番から最後まで）
+
   for (let i = half; i < currentData.length; i++) {
     const dataBlock = createEditableBlock(currentData[i], i + 1, i);
     rightColumn.appendChild(dataBlock);
@@ -299,7 +276,7 @@ function createEditableBlock(value, displayNumber, dataIndex) {
   block.style.border = "2px solid black";
   block.style.padding = "2px";
   block.style.backgroundColor = "white";
-  
+
   const numberDiv = document.createElement("div");
   numberDiv.className = "number";
   numberDiv.textContent = displayNumber;
@@ -312,7 +289,7 @@ function createEditableBlock(value, displayNumber, dataIndex) {
   numberDiv.style.justifyContent = "center";
   numberDiv.style.marginRight = "4px";
   numberDiv.style.flexShrink = "0";
-  
+
   const valueDiv = document.createElement("div");
   valueDiv.className = "value";
   valueDiv.textContent = value;
@@ -330,8 +307,8 @@ function createEditableBlock(value, displayNumber, dataIndex) {
   valueDiv.style.backgroundColor = "#f0f0f0";
   valueDiv.style.border = "1px dashed #ccc";
   valueDiv.style.cursor = "text";
-  
-  // 削除ボタンを追加
+
+  // Add delete button
   const deleteButton = document.createElement("button");
   deleteButton.textContent = "×";
   deleteButton.style.marginLeft = "4px";
@@ -342,7 +319,7 @@ function createEditableBlock(value, displayNumber, dataIndex) {
   deleteButton.style.borderRadius = "3px";
   deleteButton.style.cursor = "pointer";
   deleteButton.style.fontSize = "12px";
-  
+
   deleteButton.addEventListener("click", (e) => {
     e.stopPropagation();
     if (dataIndex >= 0 && dataIndex < currentData.length) {
@@ -351,17 +328,17 @@ function createEditableBlock(value, displayNumber, dataIndex) {
       renderEditableList();
     }
   });
-  
+
   block.appendChild(numberDiv);
   block.appendChild(valueDiv);
   block.appendChild(deleteButton);
-  
-  // ダブルクリックで編集
+
+  // click to edit
   valueDiv.addEventListener("click", (e) => {
     e.stopPropagation();
-    
+
     if (valueDiv.querySelector("input")) return;
-    
+
     const currentText = valueDiv.textContent.trim();
     const input = document.createElement("input");
     input.type = "text";
@@ -372,23 +349,22 @@ function createEditableBlock(value, displayNumber, dataIndex) {
     input.style.textAlign = "center";
     input.style.fontSize = "inherit";
     input.style.color = "inherit";
-    
+
     valueDiv.innerHTML = "";
     valueDiv.appendChild(input);
     input.focus();
     input.select();
-    
+
     const finishEdit = () => {
       const newValue = input.value.trim();
       valueDiv.textContent = newValue;
-      
-      // データを更新
+
       if (dataIndex >= 0 && dataIndex < currentData.length) {
         currentData[dataIndex] = newValue;
         updateInputField();
       }
     };
-    
+
     input.addEventListener("blur", finishEdit);
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
@@ -398,7 +374,7 @@ function createEditableBlock(value, displayNumber, dataIndex) {
       }
     });
   });
-  
+
   return block;
 }
 
@@ -416,77 +392,69 @@ function extractTargets() {
     .filter(item => item.value?.length > 0);
 }
 
-// レコーディング専用のウォッチャー開始関数
+// Recording-only watcher start function
 async function startWatcherForRecording() {
   try {
     isWatching = true;
-    // 空の配列でもウォッチャーを開始
     await invoke("start_log_watch", { targets: [] });
-    console.log("レコーディング用ログ監視を開始しました");
+    console.log("Started log watching for recording");
   } catch (e) {
-    console.error("レコーディング用ログファイルの監視中にエラーが発生しました", e);
+    console.error("Error occurred while watching log file for recording", e);
   }
 }
 
 async function startWatcher() {
   const values = extractTargets();
-  
-  // レコーディング中は空でもOK、通常時は値が必要
+
   if (values.length === 0 && !isRecording) {
-    console.warn("検索対象が設定されていません。");
+    console.warn("No search targets set.");
     return;
   }
 
   try {
     isWatching = true;
     await invoke("start_log_watch", { targets: values });
-    console.log("ログ監視を開始しました", values.length > 0 ? `(${values.length}個のターゲット)` : "(レコーディングモード)");
+    console.log("Started log watching", values.length > 0 ? `(${values.length} targets)` : "(recording mode)");
   } catch (e) {
-    console.error("ログファイルの監視中にエラーが発生しました", e);
+    console.error("Error occurred while watching log file", e);
   }
 }
 
 function autoStartWatcher() {
   if (document.querySelectorAll(".data-block").length > 0) {
-    addClickHandlersToBlocks(); // 初期ロード時にもクリックハンドラを追加
+    addClickHandlersToBlocks();
     startWatcher();
   }
 }
 
-// 新しいプレイヤーをレコーディングリストに追加（即座にリストに反映しない）
+// Add new player to recording list (do not reflect immediately)
 function recordNewPlayer(playerName) {
-  console.log("新しいプレイヤーをレコーディング:", playerName);
-  
-  // 既に記録済みかチェック
+  console.log("Recording new player:", playerName);
+
   if (recordedNewPlayers.includes(playerName)) {
-    console.log("プレイヤーは既に記録済みです:", playerName);
+    console.log("Player already recorded:", playerName);
     return;
   }
-  
-  // 新しいプレイヤーリストに追加
+
   recordedNewPlayers.push(playerName);
-  console.log("記録された新プレイヤー:", recordedNewPlayers);
+  console.log("Recorded new players:", recordedNewPlayers);
 }
 
-// 空の状態から新プレイヤーを統合する関数
+// Integrate new players from empty state
 function integrateNewPlayersFromEmpty() {
   if (recordedNewPlayers.length === 0) {
-    console.log("新しいプレイヤーはいません");
+    console.log("No new players");
     return;
   }
-  
-  console.log("新プレイヤーを統合:", recordedNewPlayers);
-  
-  // 新しいプレイヤーのみを使用（初期データは空だったため）
+
+  console.log("Integrating new players:", recordedNewPlayers);
+
   const uniqueData = [...new Set(recordedNewPlayers)];
-  
-  // データを更新
+
   currentData = uniqueData;
-  
-  // UI を更新
+
   updateInputField();
-  
-  // HTML を再生成
+
   const newInput = currentData.join(', ');
   if (newInput) {
     invoke("split_and_format", { text: newInput })
@@ -496,35 +464,32 @@ function integrateNewPlayersFromEmpty() {
         if (isEditMode) {
           enableEditMode();
         }
-        // ウォッチャーを再開して監視データを更新
         startWatcher();
       })
       .catch(e => {
-        console.error("HTML再生成エラー:", e);
+        console.error("Error regenerating HTML:", e);
       });
   }
-  
-  // 記録済み新プレイヤーリストをクリア
+
   recordedNewPlayers = [];
 }
 
-// レコーディング終了処理
+// Recording end process
 function endRecording() {
   if (!isRecording) return;
-  
-  // 新プレイヤーがいれば統合
+
   if (recordedNewPlayers.length > 0) {
     integrateNewPlayersFromEmpty();
   }
-  
+
   isRecording = false;
   elements.recordingButton.classList.remove("recording-active");
-  elements.recordingButton.textContent = "レコーディング";
-  console.log("レコーディングが自動終了されました");
+  elements.recordingButton.textContent = "Recording...";
+  console.log("Recording automatically ended");
 }
 
 listen('log-hit', event => {
-  console.log('ヒットした number:', event.payload);
+  console.log('Hit number:', event.payload);
   const hitNumber = parseInt(event.payload, 10);
 
   const blocks = document.querySelectorAll(".data-block");
@@ -532,9 +497,8 @@ listen('log-hit', event => {
     const numberElement = block.querySelector(".number");
     const number = parseInt(numberElement?.textContent.trim(), 10);
     const blockId = `block-${number}`;
-    
+
     if (number === hitNumber) {
-      // 手動ハイライトされていない場合のみ色を変更
       if (!manuallyHighlightedBlocks.has(blockId)) {
         block.style.backgroundColor = 'red';
       }
@@ -543,15 +507,13 @@ listen('log-hit', event => {
 });
 
 listen('reset-hit', () => {
-  console.log('リセット信号を受信');
-  // 背景色を元に戻す
+  console.log('Received reset signal');
   const blocks = document.querySelectorAll(".data-block");
   blocks.forEach(block => {
     const numberElement = block.querySelector(".number");
     const number = parseInt(numberElement?.textContent.trim(), 10);
     const blockId = `block-${number}`;
-    
-    // 手動でハイライトされていない場合のみリセット
+
     if (!manuallyHighlightedBlocks.has(blockId)) {
       block.style.backgroundColor = '';
     }
@@ -560,21 +522,21 @@ listen('reset-hit', () => {
 
 listen('recording-new-player', event => {
   const playerName = event.payload;
-  console.log('新しいプレイヤーが記録されました:', playerName);
-  
+  console.log('New player recorded:', playerName);
+
   if (isRecording) {
     recordNewPlayer(playerName);
   }
 });
 
-// RoundOver時の自動レコーディング終了を監視
+// Monitor for automatic recording end on RoundOver
 listen('round-over', () => {
-  console.log('RoundOver検出 - レコーディングを自動終了');
+  console.log('RoundOver detected - automatically ending recording');
   if (isRecording) {
     endRecording();
     invoke("toggle_recording", { enabled: false })
       .catch(e => {
-        console.error("レコーディング終了通知エラー:", e);
+        console.error("Error notifying recording end:", e);
       });
   }
 });

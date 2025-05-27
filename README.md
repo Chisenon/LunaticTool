@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="src-tauri\icons\icon.png" alt="App Icon" width="124" style="display:inline; vertical-align:middle;">
+  <img src="src-tauri\icons\icon.png" alt="App Icon" width="150" style="display:inline; vertical-align:middle;">
 
   # LunaticTool  
   A real-time log monitoring tool that automatically detects and notifies events related to specified player names.
@@ -10,7 +10,7 @@
 </div>
 
 <p align="center">
-<img src="resources\preview.png" alt="Preview" title="LunaticTool Preview" width="300">
+<img src="resources\preview.png" alt="Preview" title="LunaticTool Preview" width="450">
 </p>
 
 ---

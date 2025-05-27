@@ -21,13 +21,13 @@ struct Target {
     value: String,
 }
 
-// OSCメッセージキュー用の構造体
+// Structure for OSC message queue
 #[derive(Debug, Clone)]
 struct OscQueueItem {
     number: usize,
 }
 
-// メッセージキューとその最終送信時間を保持
+// Holds the message queue and its last send time
 static OSC_QUEUE: Lazy<Mutex<VecDeque<OscQueueItem>>> = Lazy::new(|| Mutex::new(VecDeque::new()));
 static LAST_SEND_TIME: Lazy<Mutex<Option<Instant>>> = Lazy::new(|| Mutex::new(None));
 static WATCH_THREAD: Lazy<Mutex<Option<std::thread::JoinHandle<()>>>> = Lazy::new(|| Mutex::new(None));
@@ -36,8 +36,8 @@ static IS_RECORDING: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 static IN_ROUND: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 static RECORDED_PLAYERS: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
 
-// OSCメッセージ送信の最小間隔（ミリ秒）
-const MIN_SEND_INTERVAL_MS: u64 = 500; // 0.5秒間隔
+// Minimum interval for sending OSC messages (milliseconds)
+const MIN_SEND_INTERVAL_MS: u64 = 500; // 0.5 second interval
 
 fn get_log_dir() -> Option<PathBuf> {
     dirs::home_dir().map(|home| home.join("AppData\\LocalLow\\VRChat\\VRChat"))
@@ -112,10 +112,10 @@ fn open_explorer(path: String) {
     let parent_dir = PathBuf::from(&path).parent().map(|p| p.to_path_buf());
     if let Some(dir) = parent_dir {
         if let Err(e) = std::process::Command::new("explorer").arg(dir).status() {
-            eprintln!("エクスプローラーを開く際にエラー: {}", e);
+            eprintln!("Error opening Explorer: {}", e);
         }
     } else {
-        eprintln!("指定されたパスから親ディレクトリを取得できませんでした");
+        eprintln!("Could not get parent directory from specified path");
     }
 }
 
@@ -123,13 +123,13 @@ fn open_explorer(path: String) {
 fn toggle_recording(enabled: bool) {
     IS_RECORDING.store(enabled, Ordering::SeqCst);
     if enabled {
-        // レコーディング開始時に記録済みプレイヤーリストをクリア
+        // Clear recorded player list when recording starts
         RECORDED_PLAYERS.lock().unwrap().clear();
         IN_ROUND.store(false, Ordering::SeqCst);
-        println!("レコーディング開始 - 記録済みプレイヤーリストをクリア");
+        println!("Recording started - cleared recorded player list");
     } else {
         IN_ROUND.store(false, Ordering::SeqCst);
-        println!("レコーディング終了");
+        println!("Recording stopped");
     }
 }
 
@@ -156,27 +156,27 @@ fn send_osc_message(addr: &str, args: Vec<OscType>) {
     }
 }
 
-// キューをクリアする関数
+// Function to clear the queue
 fn clear_osc_queue() {
     let mut queue = OSC_QUEUE.lock().unwrap();
     queue.clear();
-    // println!("OSCキューをクリアしました");
+    // println!("OSC queue cleared");
 }
 
-// キューに追加する関数
+// Function to add to the queue
 fn queue_osc_message(number: usize, window: &tauri::Window) {
     let mut queue = OSC_QUEUE.lock().unwrap();
     queue.push_back(OscQueueItem {
         number,
     });
     
-    // フロントエンドに number を通知（検出時点で通知）
+    // Notify the frontend of the number (notify at detection time)
     if let Err(e) = window.emit("log-hit", number) {
         eprintln!("emit error: {}", e);
     }
 }
 
-// キューから送信処理を行うスレッド関数
+// Thread function to process sending from the queue
 fn process_osc_queue(_window: tauri::Window) {
     while SHOULD_RUN.load(Ordering::SeqCst) {
         let should_send = {
@@ -197,9 +197,9 @@ fn process_osc_queue(_window: tauri::Window) {
         };
 
         if should_send {
-            // キューから一つ取り出して処理
+            // Take one from the queue and process
             if let Some(item) = OSC_QUEUE.lock().unwrap().pop_front() {
-                // OSC送信
+                // Send OSC
                 send_osc_message(
                     "/avatar/parameters/Lunatic_Number",
                     vec![OscType::Int(item.number as i32)],
@@ -207,49 +207,49 @@ fn process_osc_queue(_window: tauri::Window) {
             }
         }
 
-        // 少し待機してCPU使用率を抑える
+        // Wait a bit to reduce CPU usage
         thread::sleep(Duration::from_millis(100));
     }
 }
 
 #[tauri::command]
 fn send_reset(window: tauri::Window) {
-    // リセット前にキューをクリア
+    // Clear the queue before reset
     clear_osc_queue();
     
-    // リセットOSCを送信
+    // Send reset OSC
     send_osc_message(
         "/avatar/parameters/Lunatic_Reset",
         vec![OscType::Bool(true)],
     );
 
-    // フロントエンドに色を元に戻すイベントを送信
+    // Send event to frontend to restore color
     if let Err(e) = window.emit("reset-hit", ()) {
         eprintln!("emit error: {}", e);
     }
 }
 
-// 新しいプレイヤーを記録済みリストに追加し、フロントエンドに通知する関数
+// Function to add a new player to the recorded list and notify the frontend
 fn record_new_player(player_name: &str, targets: &Arc<Vec<Target>>, window: &tauri::Window) {
     let mut recorded = RECORDED_PLAYERS.lock().unwrap();
     
-    // 既に記録済みかチェック
+    // Check if already recorded
     if recorded.contains(player_name) {
         return;
     }
     
-    // 既存のターゲットに含まれているかチェック
+    // Check if included in existing targets
     if targets.iter().any(|t| t.value == player_name) {
         return;
     }
     
-    // 新しいプレイヤーとして記録
+    // Record as a new player
     recorded.insert(player_name.to_string());
-    println!("新しいプレイヤーを記録: {}", player_name);
+    println!("Recorded new player: {}", player_name);
     
-    // フロントエンドに通知
+    // Notify frontend
     if let Err(e) = window.emit("recording-new-player", player_name) {
-        eprintln!("新プレイヤー通知エラー: {}", e);
+        eprintln!("New player notification error: {}", e);
     }
 }
 
@@ -261,7 +261,7 @@ fn start_log_watch(targets: Vec<Target>, window: tauri::Window) {
     }
     SHOULD_RUN.store(true, Ordering::SeqCst);
 
-    // OSCキューを初期化
+    // Initialize OSC queue
     clear_osc_queue();
     
     {
@@ -269,7 +269,7 @@ fn start_log_watch(targets: Vec<Target>, window: tauri::Window) {
         *last_send = None;
     }
 
-    // OSCキュー処理スレッドを起動
+    // Start OSC queue processing thread
     let queue_window = window.clone();
     thread::spawn(move || {
         process_osc_queue(queue_window);
@@ -295,62 +295,62 @@ fn start_log_watch(targets: Vec<Target>, window: tauri::Window) {
                         let mut buffer = String::new();
 
                         while reader.read_line(&mut buffer).unwrap_or(0) > 0 {
-                            // レコーディング機能: "and the round type is" を検出してラウンド開始フラグを立てる
+                            // Recording feature: Detect "and the round type is" and set round start flag
                             if IS_RECORDING.load(Ordering::SeqCst) && buffer.contains("and the round type is") {
                                 if !IN_ROUND.load(Ordering::SeqCst) {
                                     IN_ROUND.store(true, Ordering::SeqCst);
-                                    println!("ラウンド開始を検出しました");
-                                    // ラウンド開始時に記録済みプレイヤーリストをクリア
+                                    println!("Detected round start");
+                                    // Clear recorded player list at round start
                                     RECORDED_PLAYERS.lock().unwrap().clear();
-                                    println!("ラウンド開始 - 記録済みプレイヤーリストをクリア");
+                                    println!("Round start - cleared recorded player list");
                                 }
                             }
 
-                            // "RoundOver" 検出
+                            // Detect "RoundOver"
                             if buffer.contains("RoundOver") {
-                                // "RoundOver" が見つかった場合、キューをクリア
+                                // If "RoundOver" is found, clear the queue
                                 clear_osc_queue();
                                 
-                                // レコーディング中かつラウンド中の場合
+                                // If recording and in round
                                 if IS_RECORDING.load(Ordering::SeqCst) && IN_ROUND.load(Ordering::SeqCst) {
                                     IN_ROUND.store(false, Ordering::SeqCst);
-                                    println!("ラウンド終了を検出しました");
+                                    println!("Detected round end");
                                     
-                                    // レコーディング終了処理
+                                    // End recording
                                     IS_RECORDING.store(false, Ordering::SeqCst);
-                                    println!("RoundOver検出 - レコーディングを自動終了");
+                                    println!("RoundOver detected - stopped recording automatically");
                                     
-                                    // フロントエンドにround-overイベントを送信
+                                    // Send round-over event to frontend
                                     if let Err(e) = window.emit("round-over", ()) {
                                         eprintln!("round-over emit error: {}", e);
                                     }
                                 }
                                 
-                                // OSCリセット信号を送信
+                                // Send OSC reset signal
                                 send_osc_message(
                                     "/avatar/parameters/Lunatic_Reset",
                                     vec![OscType::Bool(true)],
                                 );
                                 
-                                // フロントエンドにリセットイベントを送信
+                                // Send reset event to frontend
                                 if let Err(e) = window.emit("reset-hit", ()) {
                                     eprintln!("emit error: {}", e);
                                 }
                             }
 
-                            // "[DEATH][" パターンを検出
+                            // Detect "[DEATH]["
                             if let Some(start) = buffer.find("[DEATH][") {
                                 if let Some(end) = buffer[start + 8..].find(']') {
                                     let name = &buffer[start + 8..start + 8 + end];
                                     
-                                    // レコーディング機能: ラウンド中に新しい名前を発見した場合
+                                    // Recording feature: If a new name is found during the round
                                     if IS_RECORDING.load(Ordering::SeqCst) && IN_ROUND.load(Ordering::SeqCst) {
                                         record_new_player(name, &targets, &window);
                                     }
                                     
-                                    // 通常の処理: 既存のターゲットとマッチした場合
+                                    // Normal processing: If matches an existing target
                                     if let Some(target) = targets.iter().find(|t| t.value == name) {
-                                        // キューに追加（即時送信ではなく）
+                                        // Add to queue (not immediate send)
                                         queue_osc_message(target.number, &window);
                                     }
                                 }

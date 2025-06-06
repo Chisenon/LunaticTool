@@ -21,13 +21,11 @@ struct Target {
     value: String,
 }
 
-// Structure for OSC message queue
 #[derive(Debug, Clone)]
 struct OscQueueItem {
     number: usize,
 }
 
-// Holds the message queue and its last send time
 static OSC_QUEUE: Lazy<Mutex<VecDeque<OscQueueItem>>> = Lazy::new(|| Mutex::new(VecDeque::new()));
 static LAST_SEND_TIME: Lazy<Mutex<Option<Instant>>> = Lazy::new(|| Mutex::new(None));
 static WATCH_THREAD: Lazy<Mutex<Option<std::thread::JoinHandle<()>>>> = Lazy::new(|| Mutex::new(None));
@@ -36,8 +34,7 @@ static IS_RECORDING: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 static IN_ROUND: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 static RECORDED_PLAYERS: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
 
-// Minimum interval for sending OSC messages (milliseconds)
-const MIN_SEND_INTERVAL_MS: u64 = 500; // 0.5 second interval
+const MIN_SEND_INTERVAL_MS: u64 = 500;
 
 fn get_log_dir() -> Option<PathBuf> {
     dirs::home_dir().map(|home| home.join("AppData\\LocalLow\\VRChat\\VRChat"))
@@ -123,7 +120,6 @@ fn open_explorer(path: String) {
 fn toggle_recording(enabled: bool) {
     IS_RECORDING.store(enabled, Ordering::SeqCst);
     if enabled {
-        // Clear recorded player list when recording starts
         RECORDED_PLAYERS.lock().unwrap().clear();
         IN_ROUND.store(false, Ordering::SeqCst);
         println!("Recording started - cleared recorded player list");
@@ -156,27 +152,22 @@ fn send_osc_message(addr: &str, args: Vec<OscType>) {
     }
 }
 
-// Function to clear the queue
 fn clear_osc_queue() {
     let mut queue = OSC_QUEUE.lock().unwrap();
     queue.clear();
-    // println!("OSC queue cleared");
 }
 
-// Function to add to the queue
 fn queue_osc_message(number: usize, window: &tauri::Window) {
     let mut queue = OSC_QUEUE.lock().unwrap();
     queue.push_back(OscQueueItem {
         number,
     });
     
-    // Notify the frontend of the number (notify at detection time)
     if let Err(e) = window.emit("log-hit", number) {
         eprintln!("emit error: {}", e);
     }
 }
 
-// Thread function to process sending from the queue
 fn process_osc_queue(_window: tauri::Window) {
     while SHOULD_RUN.load(Ordering::SeqCst) {
         let should_send = {
@@ -197,57 +188,46 @@ fn process_osc_queue(_window: tauri::Window) {
         };
 
         if should_send {
-            // Take one from the queue and process
             if let Some(item) = OSC_QUEUE.lock().unwrap().pop_front() {
-                // Send OSC
                 send_osc_message(
-                    "/avatar/parameters/Lunatic_Number",
+                    "/avatar/parameters/ToN_DeathID",
                     vec![OscType::Int(item.number as i32)],
                 );
             }
         }
 
-        // Wait a bit to reduce CPU usage
         thread::sleep(Duration::from_millis(100));
     }
 }
 
 #[tauri::command]
 fn send_reset(window: tauri::Window) {
-    // Clear the queue before reset
     clear_osc_queue();
     
-    // Send reset OSC
     send_osc_message(
-        "/avatar/parameters/Lunatic_Reset",
+        "/avatar/parameters/ToN_DeathID_Reset",
         vec![OscType::Bool(true)],
     );
 
-    // Send event to frontend to restore color
     if let Err(e) = window.emit("reset-hit", ()) {
         eprintln!("emit error: {}", e);
     }
 }
 
-// Function to add a new player to the recorded list and notify the frontend
 fn record_new_player(player_name: &str, targets: &Arc<Vec<Target>>, window: &tauri::Window) {
     let mut recorded = RECORDED_PLAYERS.lock().unwrap();
     
-    // Check if already recorded
     if recorded.contains(player_name) {
         return;
     }
     
-    // Check if included in existing targets
     if targets.iter().any(|t| t.value == player_name) {
         return;
     }
     
-    // Record as a new player
     recorded.insert(player_name.to_string());
     println!("Recorded new player: {}", player_name);
     
-    // Notify frontend
     if let Err(e) = window.emit("recording-new-player", player_name) {
         eprintln!("New player notification error: {}", e);
     }
@@ -261,7 +241,6 @@ fn start_log_watch(targets: Vec<Target>, window: tauri::Window) {
     }
     SHOULD_RUN.store(true, Ordering::SeqCst);
 
-    // Initialize OSC queue
     clear_osc_queue();
     
     {
@@ -269,7 +248,6 @@ fn start_log_watch(targets: Vec<Target>, window: tauri::Window) {
         *last_send = None;
     }
 
-    // Start OSC queue processing thread
     let queue_window = window.clone();
     thread::spawn(move || {
         process_osc_queue(queue_window);
@@ -295,62 +273,49 @@ fn start_log_watch(targets: Vec<Target>, window: tauri::Window) {
                         let mut buffer = String::new();
 
                         while reader.read_line(&mut buffer).unwrap_or(0) > 0 {
-                            // Recording feature: Detect "and the round type is" and set round start flag
                             if IS_RECORDING.load(Ordering::SeqCst) && buffer.contains("and the round type is") {
                                 if !IN_ROUND.load(Ordering::SeqCst) {
                                     IN_ROUND.store(true, Ordering::SeqCst);
                                     println!("Detected round start");
-                                    // Clear recorded player list at round start
                                     RECORDED_PLAYERS.lock().unwrap().clear();
                                     println!("Round start - cleared recorded player list");
                                 }
                             }
 
-                            // Detect "RoundOver"
                             if buffer.contains("RoundOver") {
-                                // If "RoundOver" is found, clear the queue
                                 clear_osc_queue();
                                 
-                                // If recording and in round
                                 if IS_RECORDING.load(Ordering::SeqCst) && IN_ROUND.load(Ordering::SeqCst) {
                                     IN_ROUND.store(false, Ordering::SeqCst);
                                     println!("Detected round end");
                                     
-                                    // End recording
                                     IS_RECORDING.store(false, Ordering::SeqCst);
                                     println!("RoundOver detected - stopped recording automatically");
                                     
-                                    // Send round-over event to frontend
                                     if let Err(e) = window.emit("round-over", ()) {
                                         eprintln!("round-over emit error: {}", e);
                                     }
                                 }
                                 
-                                // Send OSC reset signal
                                 send_osc_message(
-                                    "/avatar/parameters/Lunatic_Reset",
+                                    "/avatar/parameters/ToN_DeathID_Reset",
                                     vec![OscType::Bool(true)],
                                 );
                                 
-                                // Send reset event to frontend
                                 if let Err(e) = window.emit("reset-hit", ()) {
                                     eprintln!("emit error: {}", e);
                                 }
                             }
 
-                            // Detect "[DEATH]["
                             if let Some(start) = buffer.find("[DEATH][") {
                                 if let Some(end) = buffer[start + 8..].find(']') {
                                     let name = &buffer[start + 8..start + 8 + end];
                                     
-                                    // Recording feature: If a new name is found during the round
                                     if IS_RECORDING.load(Ordering::SeqCst) && IN_ROUND.load(Ordering::SeqCst) {
                                         record_new_player(name, &targets, &window);
                                     }
                                     
-                                    // Normal processing: If matches an existing target
                                     if let Some(target) = targets.iter().find(|t| t.value == name) {
-                                        // Add to queue (not immediate send)
                                         queue_osc_message(target.number, &window);
                                     }
                                 }

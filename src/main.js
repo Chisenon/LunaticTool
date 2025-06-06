@@ -44,14 +44,12 @@ elements.openExplorerButton.addEventListener("click", async () => {
   }
 });
 
-// Add Enter key event to data-input
 elements.dataInput.addEventListener("keydown", async (e) => {
   if (e.key === "Enter") {
     e.preventDefault();
 
     const rawInput = elements.dataInput.value.trim();
 
-    // If input is empty, clear the list
     if (!rawInput) {
       clearDataAndDisplay();
       return;
@@ -94,21 +92,16 @@ elements.sendButton.addEventListener("click", async () => {
   }
 });
 
-// Function to clear data and display
 function clearDataAndDisplay() {
   currentData = [];
   updateOutput('');
   manuallyHighlightedBlocks.clear();
   console.log("Data and display cleared");
-
-  // Stop watcher
   stopWatcher();
 }
 
-// Function to stop watcher
 async function stopWatcher() {
   try {
-    // Effectively stop by starting watcher with empty array
     await invoke("start_log_watch", { targets: [] });
     isWatching = false;
     console.log("Watcher stopped");
@@ -130,7 +123,6 @@ elements.recordingButton.addEventListener("click", async () => {
   elements.recordingButton.classList.toggle("recording-active", isRecording);
   elements.recordingButton.textContent = isRecording ? "Recording..." : "Record";
 
-  // When recording starts
   if (isRecording) {
     recordedNewPlayers = [];
     currentData = [];
@@ -140,7 +132,6 @@ elements.recordingButton.addEventListener("click", async () => {
 
     await startWatcherForRecording();
   } else {
-    // When recording ends, integrate new players if any
     if (recordedNewPlayers.length > 0) {
       integrateNewPlayersFromEmpty();
     }
@@ -170,16 +161,13 @@ function updateOutput(content) {
   elements.outputArea.innerHTML = content;
 }
 
-// Add click events after update
 function addClickHandlersToBlocks() {
   const blocks = document.querySelectorAll(".data-block");
   blocks.forEach(block => {
-    // Remove existing event listeners (to prevent duplicates)
     const newBlock = block.cloneNode(true);
     block.parentNode.replaceChild(newBlock, block);
   });
 
-  // Add events to new blocks
   const newBlocks = document.querySelectorAll(".data-block");
   newBlocks.forEach(block => {
     block.addEventListener("click", function(e) {
@@ -223,7 +211,6 @@ function disableEditMode() {
   }
 }
 
-// Editable list display (two vertical columns)
 function renderEditableList() {
   const outputArea = elements.outputArea;
 
@@ -308,7 +295,6 @@ function createEditableBlock(value, displayNumber, dataIndex) {
   valueDiv.style.border = "1px dashed #ccc";
   valueDiv.style.cursor = "text";
 
-  // Add delete button
   const deleteButton = document.createElement("button");
   deleteButton.textContent = "×";
   deleteButton.style.marginLeft = "4px";
@@ -333,7 +319,6 @@ function createEditableBlock(value, displayNumber, dataIndex) {
   block.appendChild(valueDiv);
   block.appendChild(deleteButton);
 
-  // click to edit
   valueDiv.addEventListener("click", (e) => {
     e.stopPropagation();
 
@@ -392,7 +377,6 @@ function extractTargets() {
     .filter(item => item.value?.length > 0);
 }
 
-// Recording-only watcher start function
 async function startWatcherForRecording() {
   try {
     isWatching = true;
@@ -427,7 +411,6 @@ function autoStartWatcher() {
   }
 }
 
-// Add new player to recording list (do not reflect immediately)
 function recordNewPlayer(playerName) {
   console.log("Recording new player:", playerName);
 
@@ -440,7 +423,6 @@ function recordNewPlayer(playerName) {
   console.log("Recorded new players:", recordedNewPlayers);
 }
 
-// Integrate new players from empty state
 function integrateNewPlayersFromEmpty() {
   if (recordedNewPlayers.length === 0) {
     console.log("No new players");
@@ -474,7 +456,6 @@ function integrateNewPlayersFromEmpty() {
   recordedNewPlayers = [];
 }
 
-// Recording end process
 function endRecording() {
   if (!isRecording) return;
 
@@ -529,7 +510,6 @@ listen('recording-new-player', event => {
   }
 });
 
-// Monitor for automatic recording end on RoundOver
 listen('round-over', () => {
   console.log('RoundOver detected - automatically ending recording');
   if (isRecording) {

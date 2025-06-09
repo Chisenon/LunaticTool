@@ -63,6 +63,15 @@
 
 ---
 
+# 📡 OSC Parameters
+Sends OSC messages to VRChat (`127.0.0.1:9000`):
+- **`/avatar/parameters/ToN_DeathID`** (Int) - Player number when death detected (1, 2, 3...)
+- **`/avatar/parameters/ToN_DeathID_Reset`** (Bool) - `true` when round ends or manual reset
+
+Use these parameters in your avatar's Animator Controller for *Terrors of Nowhere* reactions.
+
+---
+
 # 🌐 Supported Environment
 - Windows 10/11
 - VRChat (Log files must be located at `AppData\LocalLow\VRChat\VRChat`)

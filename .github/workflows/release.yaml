@@ -4,9 +4,32 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'package.json'
+      - 'src-tauri/Cargo.toml'
 
 jobs:
+  check-version-change:
+    runs-on: ubuntu-latest
+    outputs:
+      version-changed: ${{ steps.check.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      
+      - name: Check if version changed
+        id: check
+        run: |
+          if git diff HEAD~1 HEAD --name-only | grep -E "(package\.json|src-tauri/Cargo\.toml)"; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
   cleanup-drafts:
+    needs: check-version-change
+    if: needs.check-version-change.outputs.version-changed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -17,7 +40,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish-tauri:
-    needs: cleanup-drafts
+    needs: [check-version-change, cleanup-drafts]
+    if: needs.check-version-change.outputs.version-changed == 'true'
     permissions:
       contents: write
     strategy:

@@ -12,7 +12,8 @@
       {
         "title": "LunaticTool",
         "width": 420,
-        "height": 240
+        "height": 240,
+        "dragDropEnabled": false
       }
     ],
     "security": {

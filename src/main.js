@@ -217,16 +217,18 @@ function renderEditableList() {
   while (outputArea.firstChild) {
     outputArea.removeChild(outputArea.firstChild);
   }
-
   for (let i = 0; i < currentData.length; i++) {
     const dataBlock = createEditableBlock(currentData[i], i + 1, i);
     outputArea.appendChild(dataBlock);
   }
+
+  setupDragAndDrop();
 }
 
 function createEditableBlock(value, displayNumber, dataIndex) {
-  const block = document.createElement("li");
-  block.className = "data-block";
+  const block = document.createElement("li");  block.className = "data-block";
+  block.draggable = true;
+  block.dataset.index = dataIndex;
   block.style.display = "flex";
   block.style.alignItems = "center";
   block.style.border = "2px solid black";
@@ -274,11 +276,11 @@ function createEditableBlock(value, displayNumber, dataIndex) {
   deleteButton.style.borderRadius = "3px";
   deleteButton.style.cursor = "pointer";
   deleteButton.style.fontSize = "12px";
-
   deleteButton.addEventListener("click", (e) => {
     e.stopPropagation();
-    if (dataIndex >= 0 && dataIndex < currentData.length) {
-      currentData.splice(dataIndex, 1);
+    const currentIndex = parseInt(block.dataset.index);
+    if (currentIndex >= 0 && currentIndex < currentData.length) {
+      currentData.splice(currentIndex, 1);
       updateInputField();
       renderEditableList();
     }
@@ -307,14 +309,13 @@ function createEditableBlock(value, displayNumber, dataIndex) {
     valueDiv.innerHTML = "";
     valueDiv.appendChild(input);
     input.focus();
-    input.select();
-
-    const finishEdit = () => {
+    input.select();    const finishEdit = () => {
       const newValue = input.value.trim();
       valueDiv.textContent = newValue;
 
-      if (dataIndex >= 0 && dataIndex < currentData.length) {
-        currentData[dataIndex] = newValue;
+      const currentIndex = parseInt(block.dataset.index);
+      if (currentIndex >= 0 && currentIndex < currentData.length) {
+        currentData[currentIndex] = newValue;
         updateInputField();
       }
     };
@@ -489,3 +490,119 @@ listen('round-over', () => {
       });
   }
 });
+
+function setupDragAndDrop() {
+  const outputArea = document.querySelector("#output-area");
+  let draggedElement = null;
+
+  outputArea.addEventListener("dragstart", (event) => {
+    if (event.target.classList.contains("data-block")) {
+      draggedElement = event.target;
+      event.target.classList.add("dragging");
+      event.dataTransfer.effectAllowed = "move";
+    }
+  });
+  outputArea.addEventListener("dragend", (event) => {
+    if (event.target.classList.contains("data-block")) {
+      event.target.classList.remove("dragging");
+      draggedElement = null;
+      document.querySelectorAll(".drop-indicator").forEach(indicator => {
+        indicator.remove();
+      });
+    }
+  });
+
+  outputArea.addEventListener("dragover", (event) => {
+    event.preventDefault();
+      if (!draggedElement) return;
+
+    document.querySelectorAll(".drop-indicator").forEach(indicator => {
+      indicator.remove();
+    });    const afterElement = getDragAfterElement(outputArea, event.clientY);
+    
+    const dropIndicator = document.createElement("div");
+    dropIndicator.className = "drop-indicator";
+    dropIndicator.style.height = "4px";
+    dropIndicator.style.backgroundColor = "#007acc";
+    dropIndicator.style.margin = "8px 0";
+    dropIndicator.style.borderRadius = "2px";
+
+    if (afterElement == null) {
+      outputArea.appendChild(dropIndicator);
+    } else {
+      outputArea.insertBefore(dropIndicator, afterElement);
+    }
+  });
+
+  outputArea.addEventListener("drop", (event) => {
+    event.preventDefault();
+      if (!draggedElement) return;
+
+    document.querySelectorAll(".drop-indicator").forEach(indicator => {
+      indicator.remove();
+    });
+
+    const afterElement = getDragAfterElement(outputArea, event.clientY);
+    
+    const draggedIndex = parseInt(draggedElement.dataset.index);
+    
+    const draggedData = currentData[draggedIndex];
+    currentData.splice(draggedIndex, 1);
+    
+    let newIndex;
+    if (afterElement == null) {
+      newIndex = currentData.length;
+    } else {
+      const afterIndex = parseInt(afterElement.dataset.index);
+      if (afterIndex > draggedIndex) {
+        newIndex = afterIndex - 1;
+      } else {
+        newIndex = afterIndex;
+      }
+    }
+    
+    currentData.splice(newIndex, 0, draggedData);
+    
+    if (afterElement == null) {
+      outputArea.appendChild(draggedElement);
+    } else {
+      outputArea.insertBefore(draggedElement, afterElement);
+    }
+    
+    updateInputField();
+    updateDataIndices();
+    updateBlockNumbers();
+  });
+}
+
+function getDragAfterElement(container, y) {
+  const draggableElements = [...container.querySelectorAll('.data-block:not(.dragging)')];
+  
+  return draggableElements.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    
+    if (offset < 0 && offset > closest.offset) {
+      return { offset: offset, element: child };
+    } else {
+      return closest;
+    }
+  }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+function updateBlockNumbers() {
+  const dataBlocks = document.querySelectorAll("#output-area .data-block");
+  dataBlocks.forEach((block, index) => {
+    const numberDiv = block.querySelector(".number");
+    if (numberDiv) {
+      numberDiv.textContent = index + 1;
+    }
+  });
+}
+
+function updateDataIndices() {
+  const dataBlocks = document.querySelectorAll("#output-area .data-block");
+  dataBlocks.forEach((block, index) => {
+    block.dataset.index = index;
+  });
+}

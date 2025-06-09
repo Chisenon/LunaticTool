@@ -125,18 +125,45 @@ button {
   transition: transform 0.2s ease;
 }
 
+.data-block[draggable="true"] {
+  cursor: grab;
+}
+
+.data-block[draggable="true"]:active {
+  cursor: grabbing;
+}
+
 .data-block:hover {
   transform: translateY(-1px);
 }
 
 .data-block.dragging {
   opacity: 0.5;
-  transform: rotate(5deg);
+  background-color: #f0f0f0;
 }
 
 .data-block.drag-over {
   border-color: #007acc;
   background-color: #e3f2fd;
+  transform: scale(1.02);
+}
+
+.drop-indicator {
+  height: 4px;
+  background-color: #007acc;
+  margin: 8px 0;
+  border-radius: 2px;
+  animation: pulse 0.6s ease-in-out infinite alternate;
+  box-shadow: 0 0 4px rgba(0, 122, 204, 0.5);
+}
+
+@keyframes pulse {
+  from {
+    opacity: 0.5;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .number {

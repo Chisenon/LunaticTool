@@ -218,45 +218,14 @@ function renderEditableList() {
     outputArea.removeChild(outputArea.firstChild);
   }
 
-  const container = document.createElement("div");
-  container.style.display = "flex";
-  container.style.flexWrap = "wrap";
-  container.style.gap = "4px";
-  container.style.alignContent = "flex-start";
-  container.style.width = "100%";
-
-  const leftColumn = document.createElement("div");
-  const rightColumn = document.createElement("div");
-  leftColumn.style.flex = "1";
-  leftColumn.style.display = "flex";
-  leftColumn.style.flexDirection = "column";
-  leftColumn.style.gap = "4px";
-  rightColumn.style.flex = "1";
-  rightColumn.style.display = "flex";
-  rightColumn.style.flexDirection = "column";
-  rightColumn.style.gap = "4px";
-
-  container.appendChild(leftColumn);
-  container.appendChild(rightColumn);
-  outputArea.appendChild(container);
-
-  const half = Math.ceil(currentData.length / 2);
-
-  for (let i = 0; i < half; i++) {
-    if (i < currentData.length) {
-      const dataBlock = createEditableBlock(currentData[i], i + 1, i);
-      leftColumn.appendChild(dataBlock);
-    }
-  }
-
-  for (let i = half; i < currentData.length; i++) {
+  for (let i = 0; i < currentData.length; i++) {
     const dataBlock = createEditableBlock(currentData[i], i + 1, i);
-    rightColumn.appendChild(dataBlock);
+    outputArea.appendChild(dataBlock);
   }
 }
 
 function createEditableBlock(value, displayNumber, dataIndex) {
-  const block = document.createElement("div");
+  const block = document.createElement("li");
   block.className = "data-block";
   block.style.display = "flex";
   block.style.alignItems = "center";

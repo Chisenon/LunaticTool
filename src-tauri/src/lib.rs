@@ -76,30 +76,21 @@ fn split_and_format(text: String) -> String {
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .collect();
-    let half = (items.len() + 1) / 2;
 
-    let format_column = |items: &[&str], offset: usize| {
-        items
-            .iter()
-            .enumerate()
-            .map(|(i, item)| {
-                format!(
-                    r#"<div class="data-block">
-                        <div class="number">{}</div>
-                        <div class="value">{}</div>
-                    </div>"#,
-                    i + 1 + offset,
-                    item
-                )
-            })
-            .collect::<String>()
-    };
-
-    format!(
-        r#"<div class="column">{}</div><div class="column">{}</div>"#,
-        format_column(&items[..half], 0),
-        format_column(&items[half..], half)
-    )
+    items
+        .iter()
+        .enumerate()
+        .map(|(i, item)| {
+            format!(
+                r#"<li class="data-block">
+                    <div class="number">{}</div>
+                    <div class="value">{}</div>
+                </li>"#,
+                i + 1,
+                item
+            )
+        })
+        .collect::<String>()
 }
 
 #[tauri::command]

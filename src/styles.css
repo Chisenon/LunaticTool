@@ -102,17 +102,16 @@ button {
   padding: var(--padding-medium);
   font-size: var(--font-size);
   overflow-y: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--gap-small);
-  align-content: flex-start;
 }
 
-#output-area > .column {
-  flex: 1;
+.data-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: var(--gap-small);
+  width: 100%;
 }
 
 .data-block {

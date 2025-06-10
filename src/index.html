@@ -9,27 +9,26 @@
   </head>
 
   <body>
-    <div class="container">
-      <div class="top-bar">
+    <div class="container">      <div class="top-bar">
         <input
           type="text"
           id="data-input"
           placeholder="Enter VRC display names separated by ,(comma)"
         />
-        <button id="send-button">Set</button>
+        <button id="send-button" title="Start monitoring log for these players">Set</button>
       </div>
 
       <ul id="output-area" class="data-list"></ul>
 
       <div class="bottom-bar">
-        <button id="reset-button">OSC Reset</button>
-        <button id="recording-button">Recording</button>
-        <button id="edit-button">Edit</button>
+        <button id="reset-button" title="Send OSC reset signal">OSC Reset</button>
+        <button id="recording-button" title="Auto-record new players during rounds">Recording</button>
+        <button id="edit-button" title="Edit the player list">Edit</button>
       </div>
 
       <div class="bottom-bar">
         <div id="log-dir">C:/example/log/</div>
-        <button id="open-explorer">Open</button>
+        <button id="open-explorer" title="Open file location">Open</button>
       </div>
       
     </div>

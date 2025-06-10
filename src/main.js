@@ -435,7 +435,7 @@ function endRecording() {
 
   isRecording = false;
   elements.recordingButton.classList.remove("recording-active");
-  elements.recordingButton.textContent = "Recording...";
+  elements.recordingButton.textContent = "Record";
   console.log("Recording automatically ended");
 }
 

@@ -295,5 +295,3 @@ button {
   align-items: stretch;
   align-self: flex-start;
 }
-
-/* Removed duplicated .left-column .data-block, .right-column .data-block styles. Use .data-block rule instead. */

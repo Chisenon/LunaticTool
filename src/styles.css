@@ -296,16 +296,4 @@ button {
   align-self: flex-start;
 }
 
-.left-column .data-block,
-.right-column .data-block {
-  display: flex;
-  align-items: center;
-  border: 2px solid var(--color-black);
-  padding: 1px 2px;
-  background-color: var(--color-white);
-  min-width: 0;
-  cursor: pointer;
-  transition: transform 0.2s ease;
-  margin-bottom: var(--gap-small);
-  height: 32px;
-}
+/* Removed duplicated .left-column .data-block, .right-column .data-block styles. Use .data-block rule instead. */

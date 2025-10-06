@@ -158,7 +158,42 @@ elements.editButton.addEventListener("click", () => {
 });
 
 function updateOutput(content) {
-  elements.outputArea.innerHTML = content;
+  if (isEditMode) {
+    elements.outputArea.innerHTML = content;
+    return;
+  }
+
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = content;
+  const dataBlocks = Array.from(tempDiv.querySelectorAll('.data-block'));
+  
+  if (dataBlocks.length === 0) {
+    elements.outputArea.innerHTML = content;
+    return;
+  }
+
+  const totalItems = dataBlocks.length;
+  const itemsPerColumn = Math.ceil(totalItems / 2);
+  
+  const leftColumn = dataBlocks.slice(0, itemsPerColumn);
+  const rightColumn = dataBlocks.slice(itemsPerColumn);
+  
+  const leftColumnHtml = leftColumn.map(block => block.outerHTML).join('');
+  
+  const rightColumnHtml = rightColumn.map((block, index) => {
+    const numberElement = block.querySelector('.number');
+    if (numberElement) {
+      numberElement.textContent = itemsPerColumn + index + 1;
+    }
+    return block.outerHTML;
+  }).join('');
+  
+  elements.outputArea.innerHTML = `
+    <div class="column-container">
+      <div class="column left-column">${leftColumnHtml}</div>
+      <div class="column right-column">${rightColumnHtml}</div>
+    </div>
+  `;
 }
 
 function addClickHandlersToBlocks() {

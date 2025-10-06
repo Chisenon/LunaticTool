@@ -14,7 +14,7 @@
   --color-recording-off: #4a4a4a;
   --color-edit-on: #44ff44;
   --color-edit-off: #4a4a4a;
-  --gap-small: 4px;
+  --gap-small: 2px;
   --padding-small: 4px;
   --padding-medium: 6px;
   --button-height: 28px;
@@ -108,9 +108,6 @@ button {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-small);
   width: 100%;
 }
 
@@ -118,11 +115,14 @@ button {
   display: flex;
   align-items: center;
   border: 2px solid var(--color-black);
-  padding: 2px;
+  padding: 1px 2px;
   background-color: var(--color-white);
   min-width: 0;
   cursor: pointer;
   transition: transform 0.2s ease;
+  break-inside: avoid;
+  margin-bottom: var(--gap-small);
+  height: 32px;
 }
 
 .data-block[draggable="true"] {
@@ -263,4 +263,35 @@ button {
 
 #start-button:active {
   background-color: var(--color-active);
+}
+
+@media (max-width: 400px) {
+  .data-list {
+    column-count: 1;
+  }
+  
+  .column-container {
+    flex-direction: column !important;
+    gap: 0 !important;
+  }
+  
+  .column {
+    width: 100% !important;
+  }
+}
+
+.column-container {
+  display: flex;
+  gap: 5px;
+  width: 100%;
+  align-items: flex-start;
+}
+
+.column {
+  flex: 1 1 0px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-small);
+  align-items: stretch;
+  align-self: flex-start;
 }
